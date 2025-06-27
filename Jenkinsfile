@@ -5,6 +5,8 @@ pipeline {
         stage('Update') {
             steps {
                 echo 'Updating the app'
+            }
+        }
                 
     stages {
         stage('Build') {
