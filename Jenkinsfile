@@ -2,24 +2,24 @@ pipeline {
     agent any
 
     stages {
-        stage('Update') {
+        stage('Checkout Code') {
             steps {
-                echo 'Updating the app'
+                git 'https://github.com/TheMrYesac/Jenkins'
             }
-        }                
+        }
         stage('Build') {
-            steps {
-                echo 'Building the app'
+            steps{
+                sh 'echo "Building the app"'
             }
         }
-        stage('Test') {
-            steps {
-                echo 'Running tests'
-            }
+        stage('Test) {
+              steps{
+                  sh 'echo "Running tests"'
+              }
         }
-        stage('Deploy') {
+        Stage('Deploy') {
             steps {
-                echo 'Deploying the app'
+                sh 'echo "Deploying app"'
             }
         }
     }
