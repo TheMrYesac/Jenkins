@@ -12,7 +12,7 @@ pipeline {
                 sh 'echo "Building the app"'
             }
         }
-        stage('Test) {
+        stage('Test') {
               steps{
                   sh 'echo "Running tests"'
               }
