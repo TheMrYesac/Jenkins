@@ -1,7 +1,7 @@
 pipeline{
   agent any
   environment{
-    IMAGE_NAME = 'themryesac/Jenkins'
+    IMAGE_NAME = 'themryesac/jenkins'
   }
   stages {
     stage('Checkout') {
