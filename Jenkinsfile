@@ -2,7 +2,7 @@ pipeline{
   agent any
   environment{
     VENV = 'venv'
-  }Add commentMore actions
+  }
   stages{
     stage('Checkout git'){
       steps{
