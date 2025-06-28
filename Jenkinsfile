@@ -1,29 +1,24 @@
 pipeline{
   agent any
   environment{
-    IMAGE_NAME = 'themryesac/jenkins'
-  }
-  stages {
-    stage('Checkout') {
-      steps {
+    VENV = 'venv'
+  }Add commentMore actions
+  stages{
+    stage('Checkout git'){
+      steps{
         git branch: 'main', url: 'https://github.com/TheMrYesac/jenkins'
       }
     }
-    stage('Build Docker Image') {
-      steps {
-        bat "docker build -t %IMAGE_NAME%:latest ."
+    stage('set up the venv'){
+      steps{
+        bat 'python -m venv %VENV%'
+        bat '%VENV%\\Scripts\\python -m pip install --upgrade pip'
+        bat '%VENV%\\Scripts\\pip install -r requirements.txt'
       }
     }
-    stage('Push to Dockerhub') {
-      steps {
-        withCredentials([usernamePassword(credentialsID: 'docker', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-          bat """
-          echo %DOCKER_PASS% |
-          docker login -u %DOCKER_USER% --password-stdin
-          docker push %IMAGE_NAME%:latest
-          docker logout
-          """
-        }
+    stage('RUN THE TESTS'){
+      steps{
+        bat '%VENV%\\Scripts\\python -m unittest discover -s tests'
       }
     }
   }
