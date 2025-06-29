@@ -16,7 +16,7 @@ pipeline{
       steps {
         withAWS(region: "${env.AWS_REGION}", credentials: 'aws') {
           powershell """
-          (aws ecr get-login-password --region ${env.AWS_REGION} | docker login --username AWS --password-stdin 520320208152.dkr.ecr.$env.AWS_REGION.amazonaws.com)
+          (aws ecr get-login-password --region ${env:AWS_REGION} | docker login --username AWS --password-stdin 520320208152.dkr.ecr.${env.AWS_REGION}.amazonaws.com)
           """
         }
       }
@@ -25,14 +25,14 @@ pipeline{
       steps {
         powershell """
         docker build -t $env.IMAGE_NAME:${env.IMAGE_TAG} .
-        docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} 520320208152.dkr.ecr.us-east-2.amazonaws.com/jenkins:latest
+        docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} 520320208152.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.REPO_NAME}:${env.IMAGE_TAG}
         """
       }
     }
     stage('Push to ECR') {
       steps {
         powershell """
-        docker push 520320208152.dkr.ecr.us-east-2.amazonaws.com/jenkins:latest
+        docker push 520320208152.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.REPO_NAME}:${env.IMAGE_TAG}
         """
       }
     }
