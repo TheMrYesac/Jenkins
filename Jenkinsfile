@@ -48,7 +48,8 @@ pipeline {
           Set-Content -Path \$tempPasswordFile -Value \$ECR_PASSWORD -Encoding ASCII
 
           # Construct the command to be executed by cmd.exe (which handles 'type |')
-          \$command = "type \"\$tempPasswordFile\" | docker login --username AWS --password-stdin \"\$ECR_REGISTRY_URL\""
+          # FIX: Doubled the quotes to properly escape them within the PowerShell string
+          \$command = "type ""\$tempPasswordFile"" | docker login --username AWS --password-stdin ""\$ECR_REGISTRY_URL"""
 
           # Execute via cmd.exe and capture output
           \$process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", \$command -NoNewWindow -Wait -PassThru -RedirectStandardOutput -RedirectStandardError
