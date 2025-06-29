@@ -16,39 +16,58 @@ pipeline {
       steps {
         withCredentials([aws(credentialsId: 'aws')]) {
           powershell """
-          # Ensure AWS credentials are explicitly set as PowerShell environment variables
-          # Jenkins' withCredentials usually does this, but let's be explicit if there's a conflict.
-          # The actual values come from the 'aws' credential in Jenkins, masked here for security.
-          \$env:AWS_ACCESS_KEY_ID = \$env:AWS_ACCESS_KEY_ID
-          \$env:AWS_SECRET_ACCESS_KEY = \$env:AWS_SECRET_ACCESS_KEY
-          \$env:AWS_DEFAULT_REGION = '${env.AWS_REGION}' # Also set default region if needed by AWS CLI directly
-
-          # Clear other potential AWS config environment variables to avoid conflicts
+          Remove-Item ENV:AWS_ACCESS_KEY_ID -ErrorAction SilentlyContinue
+          Remove-Item ENV:AWS_SECRET_ACCESS_KEY -ErrorAction SilentlyContinue
           Remove-Item ENV:AWS_SESSION_TOKEN -ErrorAction SilentlyContinue
+          Remove-Item ENV:AWS_DEFAULT_REGION -ErrorAction SilentlyContinue
           Remove-Item ENV:AWS_PROFILE -ErrorAction SilentlyContinue
 
-          # Add verbose debugging for AWS CLI
           \$env:AWS_CLI_DEBUG = "1" # Set AWS CLI debug mode
 
-          # Now proceed with getting the ECR password
           \$ECR_PASSWORD = aws ecr get-login-password --region ${env.AWS_REGION}
-          
-          # Unset debug mode immediately after for cleaner logs later
-          Remove-Item ENV:AWS_CLI_DEBUG -ErrorAction SilentlyContinue
+          Remove-Item ENV:AWS_CLI_DEBUG -ErrorAction SilentlyContinue # Unset debug mode
 
           if ([string]::IsNullOrEmpty(\$ECR_PASSWORD)) {
               Write-Host "ERROR: ECR password was EMPTY. Check previous AWS CLI output for errors."
               throw "Failed to retrieve ECR password."
           }
           Write-Host "Length of ECR_PASSWORD: " + \$ECR_PASSWORD.Length
-          Write-Host "First 10 chars of ECR_PASSWORD: " + \$ECR_PASSWORD.Substring(0,10) # For debugging only, remove in production!
+          Write-Host "First 10 chars of ECR_PASSWORD: " + \$ECR_PASSWORD.Substring(0,10)
 
           \$ECR_REGISTRY_URL = "520320208152.dkr.ecr.\$(\$env:AWS_REGION).amazonaws.com"
           Write-Host "DEBUG: ECR_REGISTRY_URL is '\$ECR_REGISTRY_URL'"
 
-          echo \$ECR_PASSWORD | docker login --username AWS --password-stdin \$ECR_REGISTRY_URL
-          if (\$LASTEXITCODE -ne 0) {
-              throw "Docker login failed with exit code \$LASTEXITCODE"
+          # ***** CRITICAL CHANGE HERE: Use Start-Process for robust piping *****
+          # This should pass the token more reliably to Docker's stdin.
+          # We'll also capture stderr/stdout for more detailed output if it fails.
+          \$dockerLoginCommand = "docker"
+          \$dockerLoginArgs = @(
+              "login",
+              "--username", "AWS",
+              "--password-stdin",
+              "\$ECR_REGISTRY_URL"
+          )
+
+          # Prepare StandardInput as a MemoryStream containing the password
+          \$inputStream = [System.IO.MemoryStream]::new((New-Object System.Text.ASCIIEncoding).GetBytes(\$ECR_PASSWORD))
+
+          # Invoke Start-Process and capture its output
+          \$process = Start-Process -FilePath \$dockerLoginCommand -ArgumentList \$dockerLoginArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput -RedirectStandardError -StandardInput \$inputStream
+          \$stdOut = \$process.StandardOutput.ReadToEnd()
+          \$stdErr = \$process.StandardError.ReadToEnd()
+          \$inputStream.Dispose() # Clean up the stream
+
+          Write-Host "---- Docker Login STDOUT ----"
+          Write-Host \$stdOut
+          Write-Host "-----------------------------"
+          Write-Host "---- Docker Login STDERR ----"
+          Write-Host \$stdErr
+          Write-Host "-----------------------------"
+
+          if (\$process.ExitCode -ne 0) {
+              throw "Docker login failed with exit code \$(\$process.ExitCode). See stderr/stdout above."
+          } else {
+              Write-Host "Docker login SUCCEEDED!"
           }
           """
         }
