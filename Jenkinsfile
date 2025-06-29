@@ -5,32 +5,28 @@ pipeline {
     IMAGE_NAME = 'jenkins-test'
     REPO_NAME = 'jenkins'
     IMAGE_TAG = 'latest'
-    // Define the ECR_REGISTRY here as a Jenkins environment variable,
-    // ensuring Groovy interpolates it fully at pipeline start.
-    // NOTE: We don't need 'env.' when referring to other environment variables
-    // within the 'environment' block itself.
-    ECR_REGISTRY_URL_FULL = "520320208152.dkr.ecr.${AWS_REGION}.amazonaws.com"
+    // Keep this for consistency and readability for Groovy.
+    // The PowerShell part will explicitly refer to env.AWS_REGION.
   }
   stages {
     stage('Checkout') {
       steps {
-        git branch: 'main', url: 'https://Github.com/TheMrYesac/jenkins'
+        git branch: 'main', url: 'https://github.com/TheMrYesac/jenkins'
       }
     }
     stage('Login to ECR') {
       steps {
         withCredentials([aws(credentialsId: 'aws')]) {
           powershell """
-          # These variables are PowerShell variables, correctly escaped
           \$ECR_PASSWORD = aws ecr get-login-password --region ${env.AWS_REGION}
           Write-Host "Length of ECR_PASSWORD: \$(\$ECR_PASSWORD.Length)"
           Write-Host "First 10 chars of ECR_PASSWORD: \$(\$ECR_PASSWORD.Substring(0,10))" # For debugging only, remove in production!
 
-          # IMPORTANT: Use the Jenkins environment variable directly, letting Groovy interpolate it.
-          # The variable \$ECR_REGISTRY_URL inside PowerShell is redundant now if you defined it globally.
-          Write-Host "DEBUG: ECR_REGISTRY_URL_FULL is '${env.ECR_REGISTRY_URL_FULL}'"
+          # This is the CRUCIAL change: Explicitly tell PowerShell to evaluate the env variable
+          \$ECR_REGISTRY_URL = "520320208152.dkr.ecr.$(\$env:AWS_REGION).amazonaws.com"
+          Write-Host "DEBUG: ECR_REGISTRY_URL is '\$ECR_REGISTRY_URL'" # Now this should show 'us-east-2'
 
-          echo \$ECR_PASSWORD | docker login --username AWS --password-stdin ${env.ECR_REGISTRY_URL_FULL}
+          echo \$ECR_PASSWORD | docker login --username AWS --password-stdin \$ECR_REGISTRY_URL
           if (\$LASTEXITCODE -ne 0) {
               throw "Docker login failed with exit code \$LASTEXITCODE"
           }
@@ -41,15 +37,19 @@ pipeline {
     stage('Build Docker Image') {
       steps {
         powershell """
+        # Also apply the same subexpression logic here for robustness, though it might work without it
+        \$ECR_REGISTRY_URL = "520320208152.dkr.ecr.$(\$env:AWS_REGION).amazonaws.com"
         docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} .
-        docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} ${env.ECR_REGISTRY_URL_FULL}/${env.REPO_NAME}:${env.IMAGE_TAG}
+        docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} \$ECR_REGISTRY_URL/${env.REPO_NAME}:${env.IMAGE_TAG}
         """
       }
     }
     stage('Push to ECR') {
       steps {
         powershell """
-        docker push ${env.ECR_REGISTRY_URL_FULL}/${env.REPO_NAME}:${env.IMAGE_TAG}
+        # And here
+        \$ECR_REGISTRY_URL = "520320208152.dkr.ecr.$(\$env:AWS_REGION).amazonaws.com"
+        docker push \$ECR_REGISTRY_URL/${env.REPO_NAME}:${env.IMAGE_TAG}
         """
       }
     }
