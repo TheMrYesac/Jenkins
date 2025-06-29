@@ -23,9 +23,7 @@ pipeline {
           # but *not* the primary AWS_ACCESS_KEY_ID/SECRET_ACCESS_KEY set by withCredentials.
           Remove-Item ENV:AWS_SESSION_TOKEN -ErrorAction SilentlyContinue
           Remove-Item ENV:AWS_PROFILE -ErrorAction SilentlyContinue
-          # Also, ensure AWS_SHARED_CREDENTIALS_FILE isn't pointing somewhere weird if you have one.
           Remove-Item ENV:AWS_SHARED_CREDENTIALS_FILE -ErrorAction SilentlyContinue
-
 
           # Now proceed with getting the ECR password.
           # The verbose AWS CLI debug output should appear here.
@@ -36,8 +34,6 @@ pipeline {
 
           if ([string]::IsNullOrEmpty(\$ECR_PASSWORD)) {
               Write-Host "--- AWS CLI Output (if any) ---"
-              # We expect debug output here. If not, the issue is before AWS CLI logs anything.
-              # Throw an error to halt the pipeline.
               throw "Failed to retrieve ECR password. AWS CLI reported: Unable to locate credentials."
           }
 
@@ -47,28 +43,27 @@ pipeline {
           \$ECR_REGISTRY_URL = "520320208152.dkr.ecr.\$(\$env:AWS_REGION).amazonaws.com"
           Write-Host "DEBUG: ECR_REGISTRY_URL is '\$ECR_REGISTRY_URL'"
 
-          # ***** Docker Login (using Start-Process from last attempt) *****
-          \$dockerLoginCommand = "docker"
-          \$dockerLoginArgs = @(
-              "login",
-              "--username", "AWS",
-              "--password-stdin",
-              "\$ECR_REGISTRY_URL"
-          )
+          # ***** Docker Login: Using a temporary file for robust password piping *****
+          \$tempPasswordFile = Join-Path \$env:TEMP "docker_ecr_pass.txt"
+          Set-Content -Path \$tempPasswordFile -Value \$ECR_PASSWORD -Encoding ASCII
 
-          \$inputStream = [System.IO.MemoryStream]::new((New-Object System.Text.ASCIIEncoding).GetBytes(\$ECR_PASSWORD))
+          # Construct the command to be executed by cmd.exe (which handles 'type |')
+          \$command = "type \"\$tempPasswordFile\" | docker login --username AWS --password-stdin \"\$ECR_REGISTRY_URL\""
 
-          \$process = Start-Process -FilePath \$dockerLoginCommand -ArgumentList \$dockerLoginArgs -NoNewWindow -Wait -PassThru -StandardInput \$inputStream
+          # Execute via cmd.exe and capture output
+          \$process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", \$command -NoNewWindow -Wait -PassThru -RedirectStandardOutput -RedirectStandardError
           \$stdOut = \$process.StandardOutput.ReadToEnd()
           \$stdErr = \$process.StandardError.ReadToEnd()
-          \$inputStream.Dispose()
 
-          Write-Host "---- Docker Login STDOUT ----"
+          # Clean up the temporary file
+          Remove-Item \$tempPasswordFile -ErrorAction SilentlyContinue
+
+          Write-Host "---- Docker Login STDOUT (via temp file) ----"
           Write-Host \$stdOut
-          Write-Host "-----------------------------"
-          Write-Host "---- Docker Login STDERR ----"
+          Write-Host "------------------------------------------"
+          Write-Host "---- Docker Login STDERR (via temp file) ----"
           Write-Host \$stdErr
-          Write-Host "-----------------------------"
+          Write-Host "------------------------------------------"
 
           if (\$process.ExitCode -ne 0) {
               throw "Docker login failed with exit code \$(\$process.ExitCode). See stderr/stdout above."
@@ -88,13 +83,4 @@ pipeline {
         """
       }
     }
-    stage('Push to ECR') {
-      steps {
-        powershell """
-        \$ECR_REGISTRY_URL = "520320208152.dkr.ecr.\$(\$env:AWS_REGION).amazonaws.com"
-        docker push \$ECR_REGISTRY_URL/${env.REPO_NAME}:${env.IMAGE_TAG}
-        """
-      }
-    }
-  }
-}
+    stage('
