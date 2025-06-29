@@ -58,7 +58,7 @@ pipeline {
 
           \$inputStream = [System.IO.MemoryStream]::new((New-Object System.Text.ASCIIEncoding).GetBytes(\$ECR_PASSWORD))
 
-          \$process = Start-Process -FilePath \$dockerLoginCommand -ArgumentList \$dockerLoginArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput -RedirectStandardError -StandardInput \$inputStream
+          \$process = Start-Process -FilePath \$dockerLoginCommand -ArgumentList \$dockerLoginArgs -NoNewWindow -Wait -PassThru -StandardInput \$inputStream
           \$stdOut = \$process.StandardOutput.ReadToEnd()
           \$stdErr = \$process.StandardError.ReadToEnd()
           \$inputStream.Dispose()
