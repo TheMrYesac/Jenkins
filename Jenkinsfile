@@ -50,11 +50,20 @@ pipeline {
           Set-Content -Path $tempPasswordFile -Value $ECR_PASSWORD -Encoding ASCII
 
           # Construct the command to be executed by cmd.exe (which handles 'type |')
-          # FIX: Doubled the quotes for inner string
           $command = "type ""$tempPasswordFile"" | docker login --username AWS --password-stdin ""$ECR_REGISTRY_URL"""
 
-          # Removed -RedirectStandardOutput and -RedirectStandardError as they are not needed for ReadToEnd()
-          $process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $command -NoNewWindow -Wait -PassThru
+          # Use a hashtable for Start-Process parameters to enable stream redirection
+          $startProcessArgs = @{
+              FilePath = "cmd.exe"
+              ArgumentList = "/c", $command
+              NoNewWindow = $true
+              Wait = $true
+              PassThru = $true
+              UseShellExecute = $false
+              RedirectStandardOutput = $true
+              RedirectStandardError = $true
+          }
+          $process = Start-Process @startProcessArgs
           $stdOut = $process.StandardOutput.ReadToEnd()
           $stdErr = $process.StandardError.ReadToEnd()
 
