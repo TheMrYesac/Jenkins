@@ -14,17 +14,25 @@ pipeline{
     }
     stage('Login to ECR') {
       steps {
-          withCredentials([aws(credentialsId: 'aws')]) {
-            powershell """
-            (aws ecr get-login-password --region ${env:AWS_REGION} | docker login --username AWS --password-stdin 520320208152.dkr.ecr.${env.AWS_REGION}.amazonaws.com)
-            """
+        withCredentials([aws(credentialsId: 'aws')]) {
+          powershell """
+          \$ECR_PASSWORD = aws ecr get-login-password --region ${env.AWS_REGION}
+          Write-Host "Length of ECR_PASSWORD: \$(\$ECR_PASSWORD.Length)"
+          Write-Host "First 10 chars of ECR_PASSWORD: \$(\$ECR_PASSWORD.Substring(0,10))" # For debugging only, remove in production!
+
+          \$ECR_REGISTRY = "520320208152.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
+          echo \$ECR_PASSWORD | docker login --username AWS --password-stdin \$ECR_REGISTRY
+          if (\$LASTEXITCODE -ne 0) {
+              throw "Docker login failed with exit code \$LASTEXITCODE"
+          }
+          """
         }
       }
     }
     stage('Build Docker Image') {
       steps {
         powershell """
-        docker build -t $env.IMAGE_NAME:${env.IMAGE_TAG} .
+        docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} .
         docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} 520320208152.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.REPO_NAME}:${env.IMAGE_TAG}
         """
       }
