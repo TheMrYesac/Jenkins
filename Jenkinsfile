@@ -40,7 +40,7 @@ pipeline {
           }
 
           Write-Host "Length of ECR_PASSWORD: " + $ECR_PASSWORD.Length
-          Write-Host "First 10 chars of $ECR_PASSWORD: " + $ECR_PASSWORD.Substring(0,10)
+          Write-Host "First 10 chars of ${ECR_PASSWORD}: " + $ECR_PASSWORD.Substring(0,10)
 
           $ECR_REGISTRY_URL = "520320208152.dkr.ecr.$($env:AWS_REGION).amazonaws.com"
           Write-Host "DEBUG: ECR_REGISTRY_URL is '$ECR_REGISTRY_URL'"
