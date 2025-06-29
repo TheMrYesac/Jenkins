@@ -1,7 +1,9 @@
 pipeline{
   agent any
   environment{
-    IMAGE_NAME = 'themryesac/jenkins'
+    AWS_REGION = 'us-east-2'
+    IMAGE_NAME = 'jenkins-test'
+    REPO_NAME = 'jenkins'
   }
   stages {
     stage('Checkout') {
@@ -9,18 +11,37 @@ pipeline{
         git branch: 'main', url: 'https://github.com/TheMrYesac/jenkins'
       }
     }
-    stage('Build Docker Image') {
+    stage('Tag the Image') {
       steps {
-        bat "docker build -t %IMAGE_NAME%:latest ."
+        script(
+          IMAGE_TAG = 'latest'
+        )
       }
     }
-    stage('Push to Dockerhub') {
+    stage('Login to ECR') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'docker', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-          bat 'echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin'
-          bat 'docker push %IMAGE_NAME%:latest'
-          bat 'docker logout'
+        withAWS(region: "${env.AWS_REGION}", credentials: 'aws-creds') {
+          powershell '''
+          $ecrLogin = aws ecr get-login-password --region ${env.AWS_REGION}
+
+          docker login --username AWS --password-stdin $ecrLogin https://520320208152.dkr.ecr.us-east-2.amazonaws.com
+          '''
         }
+      }
+    }
+    stage('Build Docker Image') {
+      steps {
+        powershell '''
+        docker build -t $env.IMAGE_NAME:${env.IMAGE_TAG} .
+        docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} 520320208152.dkr.ecr.us-east-2.amazonaws.com/jenkins:latest
+        '''
+      }
+    }
+    stage('Push to ECR') {
+      steps {
+        powershell '''
+        docker push 520320208152.dkr.ecr.us-east-2.amazonaws.com/jenkins:latest
+        '''
       }
     }
   }
