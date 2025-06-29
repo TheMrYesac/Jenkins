@@ -14,12 +14,10 @@ pipeline{
     }
     stage('Login to ECR') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'aws', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-          withAWS(region: "${env.AWS_REGION}", credentials: 'aws') {
+          withAWS(region: "${env.AWS_REGION}", credentials: 'aws', env: true) {
             powershell """
             (aws ecr get-login-password --region ${env:AWS_REGION} | docker login --username AWS --password-stdin 520320208152.dkr.ecr.${env.AWS_REGION}.amazonaws.com)
             """
-          }
         }
       }
     }
