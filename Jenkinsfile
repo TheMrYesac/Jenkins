@@ -14,7 +14,7 @@ pipeline{
     stage('Tag the Image') {
       steps {
         script{
-          IMAGE_TAG = 'latest'
+          env.IMAGE_TAG = 'latest'
         }
       }
     }
