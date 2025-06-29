@@ -17,7 +17,7 @@ pipeline {
         withCredentials([aws(credentialsId: 'aws')]) {
           powershell """
           # Set AWS CLI debug mode FIRST. This is crucial for debugging.
-          \$env:AWS_CLI_DEBUG = "1"
+          \\\$env:AWS_CLI_DEBUG = "1"
 
           # Clear *other* AWS-related environment variables that might confuse aws cli,
           # but *not* the primary AWS_ACCESS_KEY_ID/SECRET_ACCESS_KEY set by withCredentials.
@@ -27,47 +27,45 @@ pipeline {
 
           # Now proceed with getting the ECR password.
           # The verbose AWS CLI debug output should appear here.
-          \$ECR_PASSWORD = aws ecr get-login-password --region ${env.AWS_REGION}
+          \\\$ECR_PASSWORD = aws ecr get-login-password --region ${env.AWS_REGION}
 
           # Unset debug mode immediately after for cleaner logs later
           Remove-Item ENV:AWS_CLI_DEBUG -ErrorAction SilentlyContinue
 
-          if ([string]::IsNullOrEmpty(\$ECR_PASSWORD)) {
+          if ([string]::IsNullOrEmpty(\\\$ECR_PASSWORD)) {
               Write-Host "--- AWS CLI Output (if any) ---"
               throw "Failed to retrieve ECR password. AWS CLI reported: Unable to locate credentials."
           }
 
-          Write-Host "Length of ECR_PASSWORD: " + \$ECR_PASSWORD.Length
-          Write-Host "First 10 chars of ECR_PASSWORD: " + \$ECR_PASSWORD.Substring(0,10)
+          Write-Host "Length of ECR_PASSWORD: " + \\\$ECR_PASSWORD.Length
+          Write-Host "First 10 chars of ECR_PASSWORD: " + \\\$ECR_PASSWORD.Substring(0,10)
 
-          \$ECR_REGISTRY_URL = "520320208152.dkr.ecr.\$(\$env:AWS_REGION).amazonaws.com"
-          Write-Host "DEBUG: ECR_REGISTRY_URL is '\$ECR_REGISTRY_URL'"
+          \\\$ECR_REGISTRY_URL = "520320208152.dkr.ecr.\\\$(\\\$env:AWS_REGION).amazonaws.com"
+          Write-Host "DEBUG: ECR_REGISTRY_URL is '\\\$ECR_REGISTRY_URL'"
 
           # ***** Docker Login: Using a temporary file for robust password piping *****
-          \$tempPasswordFile = Join-Path \$env:TEMP "docker_ecr_pass.txt"
-          Set-Content -Path \$tempPasswordFile -Value \$ECR_PASSWORD -Encoding ASCII
+          \\\$tempPasswordFile = Join-Path \\\$env:TEMP "docker_ecr_pass.txt"
+          Set-Content -Path \\\$tempPasswordFile -Value \\\$ECR_PASSWORD -Encoding ASCII
 
           # Construct the command to be executed by cmd.exe (which handles 'type |')
-          # FIX: Doubled the quotes to properly escape them within the PowerShell string
-          \$command = "type ""\$tempPasswordFile"" | docker login --username AWS --password-stdin ""\$ECR_REGISTRY_URL"""
+          # FIX: Doubled the quotes for inner string, and double-escaped \$ for Groovy
+          \\\$command = "type ""\\\$tempPasswordFile"" | docker login --username AWS --password-stdin ""\\\$ECR_REGISTRY_URL"""
 
-         
-          \$process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", \$command -NoNewWindow -Wait -PassThru -RedirectStandardOutput -RedirectStandardError
-          \$stdOut = \$process.StandardOutput.ReadToEnd()
-          \$stdErr = \$process.StandardError.ReadToEnd()
+          \\\$process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", \\\$command -NoNewWindow -Wait -PassThru -RedirectStandardOutput -RedirectStandardError
+          \\\$stdOut = \\\$process.StandardOutput.ReadToEnd()
+          \\\$stdErr = \\\$process.StandardError.ReadToEnd()
 
-          
-          Remove-Item \$tempPasswordFile -ErrorAction SilentlyContinue
+          Remove-Item \\\$tempPasswordFile -ErrorAction SilentlyContinue
 
           Write-Host "---- Docker Login STDOUT (via temp file) ----"
-          Write-Host \$stdOut
+          Write-Host \\\$stdOut
           Write-Host "------------------------------------------"
           Write-Host "---- Docker Login STDERR (via temp file) ----"
-          Write-Host \$stdErr
+          Write-Host \\\$stdErr
           Write-Host "------------------------------------------"
 
-          if (\$process.ExitCode -ne 0) {
-              throw "Docker login failed with exit code \$(\$process.ExitCode). See stderr/stdout above."
+          if (\\\$process.ExitCode -ne 0) {
+              throw "Docker login failed with exit code \\\$(\\\$process.ExitCode). See stderr/stdout above."
           } else {
               Write-Host "Docker login SUCCEEDED!"
           }
@@ -78,17 +76,17 @@ pipeline {
     stage('Build Docker Image') {
       steps {
         powershell """
-        \$ECR_REGISTRY_URL = "520320208152.dkr.ecr.\$(\$env:AWS_REGION).amazonaws.com"
+        \\\$ECR_REGISTRY_URL = "520320208152.dkr.ecr.\\\$(\\\$env:AWS_REGION).amazonaws.com"
         docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} .
-        docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} \$ECR_REGISTRY_URL/${env.REPO_NAME}:${env.IMAGE_TAG}
+        docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} \\\$ECR_REGISTRY_URL/${env.REPO_NAME}:${env.IMAGE_TAG}
         """
       }
     }
     stage('Push to ECR') {
       steps {
         powershell """
-        \$ECR_REGISTRY_URL = "520320208152.dkr.ecr.\$(\$env:AWS_REGION).amazonaws.com"
-        docker push \$ECR_REGISTRY_URL/${env.REPO_NAME}:${env.IMAGE_TAG}
+        \\\$ECR_REGISTRY_URL = "520320208152.dkr.ecr.\\\$(\\\$env:AWS_REGION).amazonaws.com"
+        docker push \\\$ECR_REGISTRY_URL/${env.REPO_NAME}:${env.IMAGE_TAG}
         """
       }
     }
