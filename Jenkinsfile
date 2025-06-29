@@ -14,11 +14,12 @@ pipeline{
     }
     stage('Login to ECR') {
       steps {
-        withCredentials([aws(credentialsId: 'aws', accesskeyVariable: 'AWS_ACCESS_KEY_ID', secretkeyVariable: 'AWS_SECRET_ACCESS_KEY')])
-        withAWS(region: "${env.AWS_REGION}", credentials: 'aws') {
-          powershell """
-          (aws ecr get-login-password --region ${env:AWS_REGION} | docker login --username AWS --password-stdin 520320208152.dkr.ecr.${env.AWS_REGION}.amazonaws.com)
-          """
+        withCredentials([aws(credentialsId: 'aws', accesskeyVariable: 'AWS_ACCESS_KEY_ID', secretkeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+          withAWS(region: "${env.AWS_REGION}", credentials: 'aws') {
+            powershell """
+            (aws ecr get-login-password --region ${env:AWS_REGION} | docker login --username AWS --password-stdin 520320208152.dkr.ecr.${env.AWS_REGION}.amazonaws.com)
+            """
+          }
         }
       }
     }
