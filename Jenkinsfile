@@ -83,4 +83,13 @@ pipeline {
         """
       }
     }
-    stage('
+    stage('Push to ECR') {
+      steps {
+        powershell """
+        \$ECR_REGISTRY_URL = "520320208152.dkr.ecr.\$(\$env:AWS_REGION).amazonaws.com"
+        docker push \$ECR_REGISTRY_URL/${env.REPO_NAME}:${env.IMAGE_TAG}
+        """
+      }
+    }
+  }
+}
