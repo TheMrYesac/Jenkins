@@ -17,14 +17,14 @@ pipeline {
         withCredentials([aws(credentialsId: 'aws')]) {
           powershell """
           # Clear any pre-existing AWS config/env vars that might interfere
-          Remove-Item "$HOME/.aws" -Recurse -Force -ErrorAction SilentlyContinue # Clear AWS config files
+          # FIX: Escape \$HOME so Groovy doesn't try to interpret it
+          Remove-Item "\$HOME/.aws" -Recurse -Force -ErrorAction SilentlyContinue # Clear AWS config files
           Remove-Item ENV:AWS_ACCESS_KEY_ID -ErrorAction SilentlyContinue
           Remove-Item ENV:AWS_SECRET_ACCESS_KEY -ErrorAction SilentlyContinue
           Remove-Item ENV:AWS_SESSION_TOKEN -ErrorAction SilentlyContinue
           Remove-Item ENV:AWS_DEFAULT_REGION -ErrorAction SilentlyContinue
           Remove-Item ENV:AWS_PROFILE -ErrorAction SilentlyContinue
 
-          # Now proceed with getting the ECR password, which should use the credentials from withCredentials
           \$ECR_PASSWORD = aws ecr get-login-password --region ${env.AWS_REGION}
           Write-Host "Length of ECR_PASSWORD: " + \$ECR_PASSWORD.Length
           Write-Host "First 10 chars of ECR_PASSWORD: " + \$ECR_PASSWORD.Substring(0,10) # For debugging only, remove in production!
