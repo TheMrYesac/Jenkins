@@ -4,6 +4,7 @@ pipeline{
     AWS_REGION = 'us-east-2'
     IMAGE_NAME = 'jenkins-test'
     REPO_NAME = 'jenkins'
+    IMAGE_TAG = 'latest'
   }
   stages {
     stage('Checkout') {
@@ -11,20 +12,11 @@ pipeline{
         git branch: 'main', url: 'https://github.com/TheMrYesac/jenkins'
       }
     }
-    stage('Tag the Image') {
-      steps {
-        script{
-          env.IMAGE_TAG = 'latest'
-        }
-      }
-    }
     stage('Login to ECR') {
       steps {
         withAWS(region: "${env.AWS_REGION}", credentials: 'aws') {
           powershell '''
-          $ecrLogin = aws ecr get-login-password --region ${env.AWS_REGION}
-
-          docker login --username AWS --password-stdin $ecrLogin https://520320208152.dkr.ecr.us-east-2.amazonaws.com
+          (aws ecr get-login-password --region ${env.AWS_REGION} | docker login --username AWS --password-stdin 520320208152.dkr.ecr.$env.AWS_REGION.amazonaws.com
           '''
         }
       }
