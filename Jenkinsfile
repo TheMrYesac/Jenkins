@@ -51,12 +51,12 @@ pipeline {
           # FIX: Doubled the quotes to properly escape them within the PowerShell string
           \$command = "type ""\$tempPasswordFile"" | docker login --username AWS --password-stdin ""\$ECR_REGISTRY_URL"""
 
-          # Execute via cmd.exe and capture output
+          # Execute via cmd.exe and capture output - THIS COMMENT IS NOW INSIDE THE POWERSHELL BLOCK
           \$process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", \$command -NoNewWindow -Wait -PassThru -RedirectStandardOutput -RedirectStandardError
           \$stdOut = \$process.StandardOutput.ReadToEnd()
           \$stdErr = \$process.StandardError.ReadToEnd()
 
-          # Clean up the temporary file
+          # Clean up the temporary file - THIS COMMENT IS NOW INSIDE THE POWERSHELL BLOCK
           Remove-Item \$tempPasswordFile -ErrorAction SilentlyContinue
 
           Write-Host "---- Docker Login STDOUT (via temp file) ----"
