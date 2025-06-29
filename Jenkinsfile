@@ -16,30 +16,38 @@ pipeline {
       steps {
         withCredentials([aws(credentialsId: 'aws')]) {
           powershell """
-          Remove-Item ENV:AWS_ACCESS_KEY_ID -ErrorAction SilentlyContinue
-          Remove-Item ENV:AWS_SECRET_ACCESS_KEY -ErrorAction SilentlyContinue
+          # Set AWS CLI debug mode FIRST. This is crucial for debugging.
+          \$env:AWS_CLI_DEBUG = "1"
+
+          # Clear *other* AWS-related environment variables that might confuse aws cli,
+          # but *not* the primary AWS_ACCESS_KEY_ID/SECRET_ACCESS_KEY set by withCredentials.
           Remove-Item ENV:AWS_SESSION_TOKEN -ErrorAction SilentlyContinue
-          Remove-Item ENV:AWS_DEFAULT_REGION -ErrorAction SilentlyContinue
           Remove-Item ENV:AWS_PROFILE -ErrorAction SilentlyContinue
+          # Also, ensure AWS_SHARED_CREDENTIALS_FILE isn't pointing somewhere weird if you have one.
+          Remove-Item ENV:AWS_SHARED_CREDENTIALS_FILE -ErrorAction SilentlyContinue
 
-          \$env:AWS_CLI_DEBUG = "1" # Set AWS CLI debug mode
 
+          # Now proceed with getting the ECR password.
+          # The verbose AWS CLI debug output should appear here.
           \$ECR_PASSWORD = aws ecr get-login-password --region ${env.AWS_REGION}
-          Remove-Item ENV:AWS_CLI_DEBUG -ErrorAction SilentlyContinue # Unset debug mode
+
+          # Unset debug mode immediately after for cleaner logs later
+          Remove-Item ENV:AWS_CLI_DEBUG -ErrorAction SilentlyContinue
 
           if ([string]::IsNullOrEmpty(\$ECR_PASSWORD)) {
-              Write-Host "ERROR: ECR password was EMPTY. Check previous AWS CLI output for errors."
-              throw "Failed to retrieve ECR password."
+              Write-Host "--- AWS CLI Output (if any) ---"
+              # We expect debug output here. If not, the issue is before AWS CLI logs anything.
+              # Throw an error to halt the pipeline.
+              throw "Failed to retrieve ECR password. AWS CLI reported: Unable to locate credentials."
           }
+
           Write-Host "Length of ECR_PASSWORD: " + \$ECR_PASSWORD.Length
           Write-Host "First 10 chars of ECR_PASSWORD: " + \$ECR_PASSWORD.Substring(0,10)
 
           \$ECR_REGISTRY_URL = "520320208152.dkr.ecr.\$(\$env:AWS_REGION).amazonaws.com"
           Write-Host "DEBUG: ECR_REGISTRY_URL is '\$ECR_REGISTRY_URL'"
 
-          # ***** CRITICAL CHANGE HERE: Use Start-Process for robust piping *****
-          # This should pass the token more reliably to Docker's stdin.
-          # We'll also capture stderr/stdout for more detailed output if it fails.
+          # ***** Docker Login (using Start-Process from last attempt) *****
           \$dockerLoginCommand = "docker"
           \$dockerLoginArgs = @(
               "login",
@@ -48,14 +56,12 @@ pipeline {
               "\$ECR_REGISTRY_URL"
           )
 
-          # Prepare StandardInput as a MemoryStream containing the password
-          \$inputStream = [System.IO.MemoryStream]::new((New-Object System.Text.ASCIIEncoding).GetBytes(\$ECR_PASSWORD))
+          \$inputStream = [System.IO.MemoryStream]::new((New-Object System.Text.ASCIIEncoding).GetBytes(\$ECR_PASSWORD)))
 
-          # Invoke Start-Process and capture its output
           \$process = Start-Process -FilePath \$dockerLoginCommand -ArgumentList \$dockerLoginArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput -RedirectStandardError -StandardInput \$inputStream
           \$stdOut = \$process.StandardOutput.ReadToEnd()
           \$stdErr = \$process.StandardError.ReadToEnd()
-          \$inputStream.Dispose() # Clean up the stream
+          \$inputStream.Dispose()
 
           Write-Host "---- Docker Login STDOUT ----"
           Write-Host \$stdOut
