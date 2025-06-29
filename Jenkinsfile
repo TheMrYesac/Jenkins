@@ -20,8 +20,12 @@ pipeline{
           Write-Host "Length of ECR_PASSWORD: \$(\$ECR_PASSWORD.Length)"
           Write-Host "First 10 chars of ECR_PASSWORD: \$(\$ECR_PASSWORD.Substring(0,10))" # For debugging only, remove in production!
 
-          \$ECR_REGISTRY = "520320208152.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
-          echo \$ECR_PASSWORD | docker login --username AWS --password-stdin \$ECR_REGISTRY
+          # This line remains correct for its assignment
+          \$ECR_REGISTRY_URL = "520320208152.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
+          Write-Host "DEBUG: ECR_REGISTRY_URL is '\$ECR_REGISTRY_URL'" # Add this for further debugging
+
+          # FIX IS HERE: Use the fully formed URL directly, or ensure $ECR_REGISTRY_URL is used correctly
+          echo \$ECR_PASSWORD | docker login --username AWS --password-stdin \$ECR_REGISTRY_URL
           if (\$LASTEXITCODE -ne 0) {
               throw "Docker login failed with exit code \$LASTEXITCODE"
           }
