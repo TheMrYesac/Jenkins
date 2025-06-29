@@ -53,7 +53,8 @@ pipeline {
           # FIX: Doubled the quotes for inner string
           $command = "type ""$tempPasswordFile"" | docker login --username AWS --password-stdin ""$ECR_REGISTRY_URL"""
 
-          $process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $command -NoNewWindow -Wait -PassThru -RedirectStandardOutput -RedirectStandardError
+          # Removed -RedirectStandardOutput and -RedirectStandardError as they are not needed for ReadToEnd()
+          $process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $command -NoNewWindow -Wait -PassThru
           $stdOut = $process.StandardOutput.ReadToEnd()
           $stdErr = $process.StandardError.ReadToEnd()
 
