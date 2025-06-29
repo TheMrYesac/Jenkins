@@ -5,6 +5,8 @@ pipeline{
     IMAGE_NAME = 'jenkins-test'
     REPO_NAME = 'jenkins'
     IMAGE_TAG = 'latest'
+    // Define the ECR_REGISTRY here as a Jenkins environment variable
+    ECR_REGISTRY = "520320208152.dkr.ecr.${AWS_REGION}.amazonaws.com" // <--- Moved here
   }
   stages {
     stage('Checkout') {
@@ -20,12 +22,8 @@ pipeline{
           Write-Host "Length of ECR_PASSWORD: \$(\$ECR_PASSWORD.Length)"
           Write-Host "First 10 chars of ECR_PASSWORD: \$(\$ECR_PASSWORD.Substring(0,10))" # For debugging only, remove in production!
 
-          # This line remains correct for its assignment
-          \$ECR_REGISTRY_URL = "520320208152.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
-          Write-Host "DEBUG: ECR_REGISTRY_URL is '\$ECR_REGISTRY_URL'" # Add this for further debugging
-
-          # FIX IS HERE: Use the fully formed URL directly, or ensure $ECR_REGISTRY_URL is used correctly
-          echo \$ECR_PASSWORD | docker login --username AWS --password-stdin \$ECR_REGISTRY_URL
+          # Access ECR_REGISTRY as a Jenkins environment variable directly within PowerShell
+          echo \$ECR_PASSWORD | docker login --username AWS --password-stdin ${env.ECR_REGISTRY}
           if (\$LASTEXITCODE -ne 0) {
               throw "Docker login failed with exit code \$LASTEXITCODE"
           }
@@ -37,14 +35,14 @@ pipeline{
       steps {
         powershell """
         docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} .
-        docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} 520320208152.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.REPO_NAME}:${env.IMAGE_TAG}
+        docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} ${env.ECR_REGISTRY}/${env.REPO_NAME}:${env.IMAGE_TAG}
         """
       }
     }
     stage('Push to ECR') {
       steps {
         powershell """
-        docker push 520320208152.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.REPO_NAME}:${env.IMAGE_TAG}
+        docker push ${env.ECR_REGISTRY}/${env.REPO_NAME}:${env.IMAGE_TAG}
         """
       }
     }
