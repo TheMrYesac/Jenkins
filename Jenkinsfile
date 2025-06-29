@@ -16,18 +16,30 @@ pipeline {
       steps {
         withCredentials([aws(credentialsId: 'aws')]) {
           powershell """
-          # REMOVED: Remove-Item "\$HOME/.aws" -Recurse -Force -ErrorAction SilentlyContinue
-          # We manually configured this with psexec, so we don't want to delete it.
+          # Ensure AWS credentials are explicitly set as PowerShell environment variables
+          # Jenkins' withCredentials usually does this, but let's be explicit if there's a conflict.
+          # The actual values come from the 'aws' credential in Jenkins, masked here for security.
+          \$env:AWS_ACCESS_KEY_ID = \$env:AWS_ACCESS_KEY_ID
+          \$env:AWS_SECRET_ACCESS_KEY = \$env:AWS_SECRET_ACCESS_KEY
+          \$env:AWS_DEFAULT_REGION = '${env.AWS_REGION}' # Also set default region if needed by AWS CLI directly
 
-          # These environment variable removals are generally safe, as they just clear dynamic vars.
-          Remove-Item ENV:AWS_ACCESS_KEY_ID -ErrorAction SilentlyContinue
-          Remove-Item ENV:AWS_SECRET_ACCESS_KEY -ErrorAction SilentlyContinue
+          # Clear other potential AWS config environment variables to avoid conflicts
           Remove-Item ENV:AWS_SESSION_TOKEN -ErrorAction SilentlyContinue
-          Remove-Item ENV:AWS_DEFAULT_REGION -ErrorAction SilentlyContinue
           Remove-Item ENV:AWS_PROFILE -ErrorAction SilentlyContinue
 
-          # Now proceed with getting the ECR password, which should use the credentials from withCredentials (or the configured system profile)
+          # Add verbose debugging for AWS CLI
+          \$env:AWS_CLI_DEBUG = "1" # Set AWS CLI debug mode
+
+          # Now proceed with getting the ECR password
           \$ECR_PASSWORD = aws ecr get-login-password --region ${env.AWS_REGION}
+          
+          # Unset debug mode immediately after for cleaner logs later
+          Remove-Item ENV:AWS_CLI_DEBUG -ErrorAction SilentlyContinue
+
+          if ([string]::IsNullOrEmpty(\$ECR_PASSWORD)) {
+              Write-Host "ERROR: ECR password was EMPTY. Check previous AWS CLI output for errors."
+              throw "Failed to retrieve ECR password."
+          }
           Write-Host "Length of ECR_PASSWORD: " + \$ECR_PASSWORD.Length
           Write-Host "First 10 chars of ECR_PASSWORD: " + \$ECR_PASSWORD.Substring(0,10) # For debugging only, remove in production!
 
