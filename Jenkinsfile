@@ -1,7 +1,7 @@
 pipeline{
   agent any
   environment{
-    AWS_REGION = 'us-east-2'
+    AWS_REGION = 'us-east-1'
     IMAGE_NAME = 'jenkins-test'
     REPO_NAME = 'jenkins'
     IMAGE_TAG = 'latest'
